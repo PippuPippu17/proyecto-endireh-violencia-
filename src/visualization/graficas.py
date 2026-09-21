@@ -223,7 +223,7 @@ def figura_01_distribucion_edad(df: pl.DataFrame) -> None:
     ax.axvline(9.5, color=NARANJA, linewidth=1.6, linestyle="--")
     ax.annotate(
         f"{imposibles:,} valores ({100 * imposibles / len(valores):.1f}%)\n"
-        "por debajo de 10: imposibles\ncomo edad a la primera union",
+        "por debajo de 10 años,\nimposibles como edad\na la primera unión",
         xy=(9.5, ax.get_ylim()[1] * 0.78),
         xytext=(22, ax.get_ylim()[1] * 0.80),
         fontsize=9,
@@ -234,15 +234,15 @@ def figura_01_distribucion_edad(df: pl.DataFrame) -> None:
     preparar_ejes(ax)
     titular(
         ax,
-        "La variable edad_primer_union no se comporta como una edad",
-        "Distribucion de frecuencias de los valores observados",
+        "Los valores de edad_primer_union no corresponden a una edad",
+        "Distribución de frecuencias de los valores declarados",
     )
     ax.set_xlabel("Valor declarado")
-    ax.set_ylabel("Numero de mujeres encuestadas")
+    ax.set_ylabel("Mujeres encuestadas")
     pie_de_figura(
         ax,
-        f"ENDIREH 2021 (INEGI). n = {len(valores):,} registros con valor. "
-        "Los codigos 98 y 99 ya fueron convertidos a nulo en el preprocesamiento.",
+        f"ENDIREH 2021 (INEGI). n = {len(valores):,} registros con valor.\n"
+        "Los códigos 98 y 99 se excluyen por corresponder a no respuesta.",
     )
     guardar(fig, "01_distribucion_edad_primer_union.png")
 
@@ -279,8 +279,8 @@ def figura_02_ingreso_por_violencia(df: pl.DataFrame) -> None:
     alto = 0.38
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
-    ax.barh(y + alto / 2, v_sin, height=alto, color=AZUL, label="No reporto violencia")
-    ax.barh(y - alto / 2, v_con, height=alto, color=NARANJA, label="Reporto violencia")
+    ax.barh(y + alto / 2, v_sin, height=alto, color=AZUL, label="No reportó violencia")
+    ax.barh(y - alto / 2, v_con, height=alto, color=NARANJA, label="Reportó violencia")
 
     for yi, (vs, vc) in enumerate(zip(v_sin, v_con)):
         ax.text(
@@ -308,17 +308,17 @@ def figura_02_ingreso_por_violencia(df: pl.DataFrame) -> None:
     ax.legend(frameon=False, loc="upper right", fontsize=9.5)
     titular(
         ax,
-        "Los dos grupos solo se separan en la mitad alta de la distribucion",
-        "Ingreso mensual de la pareja por percentil, segun si se reporto violencia",
+        "La diferencia de ingreso se concentra en la mitad alta de la distribución",
+        "Ingreso mensual de la pareja por percentil, según si se reportó violencia",
     )
     ax.set_xlabel("Ingreso de la pareja (pesos)")
     pie_de_figura(
         ax,
         f"ENDIREH 2021 (INEGI). n = {len(con):,} con violencia y {len(sin):,} sin violencia; "
-        "se excluyen ingresos en cero.\n"
-        "Hasta la mediana las distribuciones son casi identicas; la brecha aparece en Q3 y P90. "
-        "La asociacion no implica causalidad:\ntambien puede reflejar diferencias en la "
-        "disposicion a reportar, no solo en la ocurrencia.",
+        "se excluyen los ingresos en cero.\n"
+        "Hasta la mediana ambas distribuciones coinciden; la diferencia aparece en Q3 y P90.\n"
+        "La asociación no permite establecer causalidad: también puede reflejar diferencias "
+        "en la disposición a reportar.",
     )
     guardar(fig, "02_ingreso_por_violencia.png")
 
@@ -344,13 +344,13 @@ def figura_03_prevalencia_entidad(df: pl.DataFrame) -> None:
     titular(
         ax,
         "Prevalencia de violencia de pareja por entidad federativa",
-        "Porcentaje de mujeres de 15 anios y mas que la reportaron, ponderado",
+        "Porcentaje ponderado de mujeres de 15 años y más que la reportaron",
     )
     ax.set_xlabel("Prevalencia (%)")
     pie_de_figura(
         ax,
-        f"ENDIREH 2021 (INEGI). n = {df.height:,} registros, ponderados por "
-        "factor_expansion. Mide lo REPORTADO en la encuesta, no la ocurrencia real.",
+        f"ENDIREH 2021 (INEGI). n = {df.height:,} registros ponderados por factor_expansion.\n"
+        "La cifra corresponde a la violencia reportada en la encuesta, no a su ocurrencia.",
     )
     guardar(fig, "03_prevalencia_por_entidad.png")
 
@@ -382,8 +382,8 @@ def figura_04_prevalencia_estado_civil(df: pl.DataFrame) -> None:
     pie_de_figura(
         ax,
         f"ENDIREH 2021 (INEGI). n = {df.height:,} registros ponderados.\n"
-        "Lectura: lo mas probable es que la violencia haya precedido a la separacion, "
-        "no que separarse la provoque. El dato no permite establecer la direccion causal.",
+        "La encuesta es transversal: registra el estado conyugal y la violencia en un mismo\n"
+        "momento, por lo que no permite establecer el orden entre ambos.",
     )
     guardar(fig, "04_prevalencia_por_estado_civil.png")
 
