@@ -1,12 +1,7 @@
-# Entorno virtual
 env/
 .venv/
-
-# Ignorar datos originales pesados (Paso 2 y Entrega)
 data/data-raw/*
 !data/data-raw/.gitkeep
-
-# Archivos de caché de Python y Jupyter
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
