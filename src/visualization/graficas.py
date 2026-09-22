@@ -8,6 +8,8 @@ insertarse en el reporte:
     02_ingreso_por_violencia.png
     03_prevalencia_por_entidad.png
     04_prevalencia_por_estado_civil.png
+    05_dispersion_edad_por_violencia.png
+    06_escolaridad_muestra_vs_poblacion.png
 
 Cuatro criterios de diseno se aplican en todas ellas:
 
@@ -221,21 +223,27 @@ def figura_01_distribucion_edad(df: pl.DataFrame) -> None:
 
     ax.axvspan(-0.5, 9.5, color=NARANJA, alpha=0.10, zorder=0)
     ax.axvline(9.5, color=NARANJA, linewidth=1.6, linestyle="--")
+    # La flecha y el texto comparten altura, y el texto se centra
+    # verticalmente sobre ella, de modo que la flecha quede horizontal.
+    altura = ax.get_ylim()[1] * 0.72
     ax.annotate(
         f"{imposibles:,} valores ({100 * imposibles / len(valores):.1f}%)\n"
-        "por debajo de 10 años,\nimposibles como edad\na la primera unión",
-        xy=(9.5, ax.get_ylim()[1] * 0.78),
-        xytext=(22, ax.get_ylim()[1] * 0.80),
+        "por debajo de 10 años",
+        xy=(9.5, altura),
+        xytext=(24, altura),
         fontsize=9,
         color=NARANJA,
+        va="center",
+        ha="left",
         arrowprops=dict(arrowstyle="->", color=NARANJA, linewidth=1.2),
     )
 
     preparar_ejes(ax)
     titular(
         ax,
-        "Los valores de edad_primer_union no corresponden a una edad",
-        "Distribución de frecuencias de los valores declarados",
+        "Distribución de la variable edad_primer_union",
+        "Declarada como edad a la primera unión, pero el "
+        f"{100 * imposibles / len(valores):.1f}% de los valores es menor a 10",
     )
     ax.set_xlabel("Valor declarado")
     ax.set_ylabel("Mujeres encuestadas")
@@ -388,6 +396,145 @@ def figura_04_prevalencia_estado_civil(df: pl.DataFrame) -> None:
     guardar(fig, "04_prevalencia_por_estado_civil.png")
 
 
+def figura_05_dispersion_edad(df: pl.DataFrame) -> None:
+    """
+    Diagrama de caja de edad_primer_union segun si se reporto violencia.
+
+    Pone en imagen la comparacion de dispersion del Paso 7: la caja abarca el
+    rango intercuartilico y la linea interior marca la mediana, de modo que dos
+    cajas iguales describen dos distribuciones con la misma forma.
+    """
+    sub = df.filter(pl.col("edad_primer_union").is_not_null())
+    con = sub.filter(pl.col("sufrio_violencia_pareja") == 1)[
+        "edad_primer_union"
+    ].to_numpy()
+    sin = sub.filter(pl.col("sufrio_violencia_pareja") == 0)[
+        "edad_primer_union"
+    ].to_numpy()
+
+    fig, ax = plt.subplots(figsize=(9, 4.8))
+    cajas = ax.boxplot(
+        [sin, con],
+        tick_labels=["No reportó\nviolencia", "Reportó\nviolencia"],
+        vert=False,
+        patch_artist=True,
+        widths=0.5,
+        showfliers=False,
+        medianprops=dict(color=TINTA, linewidth=2),
+        whiskerprops=dict(color=TINTA_SUAVE, linewidth=1.2),
+        capprops=dict(color=TINTA_SUAVE, linewidth=1.2),
+        boxprops=dict(linewidth=0),
+    )
+    for caja, color in zip(cajas["boxes"], (AZUL, NARANJA)):
+        caja.set_facecolor(color)
+
+    # Los cuartiles coinciden en ambos grupos, asi que se rotulan una sola vez.
+    q1, mediana, q3 = np.percentile(sin, [25, 50, 75])
+    for valor, etiqueta in ((q1, "Q1"), (mediana, "Mediana"), (q3, "Q3")):
+        ax.annotate(
+            f"{etiqueta} = {valor:.0f}",
+            xy=(valor, 2.42),
+            fontsize=8.5,
+            color=TINTA_SUAVE,
+            ha="center",
+        )
+
+    ax.set_ylim(0.4, 2.7)
+    preparar_ejes(ax, eje_valor="x")
+    titular(
+        ax,
+        "Ambos grupos comparten la misma distribución",
+        "Dispersión de edad_primer_union según si se reportó violencia de pareja",
+    )
+    ax.set_xlabel("Valor declarado")
+    pie_de_figura(
+        ax,
+        f"ENDIREH 2021 (INEGI). n = {len(con):,} con violencia y {len(sin):,} sin violencia; "
+        "no se dibujan los valores atípicos.\n"
+        "Los dos grupos coinciden en Q1 (2), mediana (6), Q3 (15), IQR (13) y media (10.03): "
+        "la variable no discrimina\nentre quienes reportaron violencia y quienes no.",
+    )
+    guardar(fig, "05_dispersion_edad_por_violencia.png")
+
+
+def figura_06_escolaridad(df: pl.DataFrame) -> None:
+    """
+    Distribucion de nivel_escolaridad en la muestra y en la poblacion.
+
+    Contrasta el peso de cada categoria antes y despues de aplicar el factor de
+    expansion. La distancia entre ambas barras es el efecto de la ponderacion, y
+    explica por que las medidas simples y las ponderadas no coinciden.
+    """
+    resumen = (
+        df.group_by("nivel_escolaridad")
+        .agg(
+            pl.len().alias("n"),
+            pl.col("factor_expansion").sum().alias("poblacion"),
+        )
+        .with_columns(
+            (100 * pl.col("n") / df.height).alias("pct_muestra"),
+            (100 * pl.col("poblacion") / df["factor_expansion"].sum()).alias("pct_pob"),
+        )
+        # Orden natural de las categorias: al ser ordinal no se reordena por
+        # frecuencia, porque el orden forma parte de la informacion.
+        .sort("nivel_escolaridad")
+    )
+    categorias = [str(x) for x in resumen["nivel_escolaridad"].to_list()]
+    muestra = resumen["pct_muestra"].to_numpy()
+    poblacion = resumen["pct_pob"].to_numpy()
+
+    y = np.arange(len(categorias))
+    alto = 0.38
+
+    fig, ax = plt.subplots(figsize=(9, 5.2))
+    ax.barh(
+        y + alto / 2, poblacion, height=alto, color=AZUL, label="Población estimada"
+    )
+    ax.barh(
+        y - alto / 2, muestra, height=alto, color=NARANJA, label="Muestra encuestada"
+    )
+
+    for yi, (pob, mue) in enumerate(zip(poblacion, muestra)):
+        ax.text(
+            pob + 0.6,
+            yi + alto / 2,
+            f"{pob:.1f}%",
+            va="center",
+            fontsize=9,
+            color=TINTA_SUAVE,
+        )
+        ax.text(
+            mue + 0.6,
+            yi - alto / 2,
+            f"{mue:.1f}%",
+            va="center",
+            fontsize=9,
+            color=TINTA_SUAVE,
+        )
+
+    ax.set_yticks(y, categorias)
+    ax.invert_yaxis()
+    ax.set_xlim(0, max(poblacion.max(), muestra.max()) * 1.20)
+    preparar_ejes(ax, eje_valor="x")
+    ax.legend(frameon=False, loc="lower right", fontsize=9.5)
+    titular(
+        ax,
+        "La ponderación redistribuye el peso entre categorías",
+        "Distribución de nivel_escolaridad en la muestra y en la población estimada",
+    )
+    ax.set_xlabel("Porcentaje del total (%)")
+    pie_de_figura(
+        ax,
+        f"ENDIREH 2021 (INEGI). n = {df.height:,} registros; la población estimada pondera "
+        "cada registro por factor_expansion.\n"
+        "A1 pierde 7.4 puntos al ponderar y C1 gana 5.3. Esa redistribución es la razón por "
+        "la que una medida simple y\nsu versión ponderada no coinciden. Las categorías A1 a "
+        "C2 no corresponden al catálogo educativo del INEGI\ny se presentan sin interpretar "
+        "su contenido.",
+    )
+    guardar(fig, "06_escolaridad_muestra_vs_poblacion.png")
+
+
 # --------------------------------------------------------------------------
 
 
@@ -404,7 +551,9 @@ def generar_graficas() -> None:
     figura_02_ingreso_por_violencia(df)
     figura_03_prevalencia_entidad(df)
     figura_04_prevalencia_estado_civil(df)
-    print("[graficas] Listo: 4 figuras generadas.")
+    figura_05_dispersion_edad(df)
+    figura_06_escolaridad(df)
+    print("[graficas] Listo: 6 figuras generadas.")
 
 
 if __name__ == "__main__":
