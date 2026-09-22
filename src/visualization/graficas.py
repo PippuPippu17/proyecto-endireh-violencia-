@@ -1,27 +1,13 @@
 """
 Graficas del analisis exploratorio de la ENDIREH 2021.
 
-Construye cuatro figuras y las guarda en reports/figuras/, listas para
-insertarse en el reporte:
+Construye cinco figuras y las guarda en reports/figuras/:
 
     01_distribucion_edad_primer_union.png
     02_ingreso_por_violencia.png
     03_prevalencia_por_entidad.png
     04_prevalencia_por_estado_civil.png
     05_escolaridad_muestra_vs_poblacion.png
-
-Cuatro criterios de diseno se aplican en todas ellas:
-
-  - Color. Azul y naranja identifican a los dos grupos comparados. El par esta
-    verificado para daltonismo: separacion de 24.7 en protanopia, frente al
-    minimo recomendado de 8.
-  - Las graficas de una sola serie usan un unico color. El color no codifica
-    el lugar en el ranking, porque sugiere diferencias de categoria que no
-    existen; el orden ya lo comunica la posicion de cada barra.
-  - Ejes y reticula en gris tenue, para que la tinta del encuadre no compita
-    con la de los datos.
-  - Toda prevalencia esta ponderada por factor_expansion, y el pie de cada
-    figura lo declara junto con el tamano de muestra.
 
 Uso:
     python3 src/visualization/graficas.py
@@ -32,22 +18,19 @@ from pathlib import Path
 
 import matplotlib
 
-# Agg dibuja en memoria en lugar de abrir una ventana. Debe elegirse antes de
-# importar pyplot, y permite generar las figuras en una terminal sin entorno
-# grafico.
+# Agg dibuja en memoria; permite generar las figuras sin entorno grafico.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.transforms import blended_transform_factory
 import numpy as np
 import polars as pl
 
-# Agregamos la raiz del proyecto al path para poder importar config/.
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 from config.rutas import BASE_DIR, RUTA_DATA_PROCESSED
 
 RUTA_FIGURAS = BASE_DIR / "reports" / "figuras"
 
-# Paleta comun a las cuatro figuras.
+# Paleta comun a todas las figuras.
 SUPERFICIE = "#fcfcfb"
 TINTA = "#0b0b0b"
 TINTA_SUAVE = "#52514e"
@@ -55,8 +38,7 @@ AZUL = "#2a78d6"  # categoria 1 / serie unica
 NARANJA = "#eb6834"  # categoria 2
 GRIS_RETICULA = "#d8d7d2"
 
-# rcParams fija los valores por omision de matplotlib para todo el modulo, de
-# modo que cada figura no tenga que repetir colores ni tamanos.
+# Valores por omision de matplotlib para todo el modulo.
 plt.rcParams.update(
     {
         "figure.facecolor": SUPERFICIE,
@@ -77,9 +59,7 @@ def preparar_ejes(ax, eje_valor: str = "y") -> None:
     """
     Deja los ejes con reticula tenue y sin marcos superfluos.
 
-    eje_valor indica cual de los dos ejes lleva la magnitud: "y" en las
-    graficas de barras verticales e histogramas, "x" en las horizontales. Solo
-    ese eje recibe reticula; el de categorias no la necesita.
+    eje_valor indica cual de los dos ejes lleva la magnitud y recibe reticula.
     """
     for lado in ("top", "right"):
         ax.spines[lado].set_visible(False)
@@ -90,13 +70,7 @@ def preparar_ejes(ax, eje_valor: str = "y") -> None:
 
 
 def titular(ax, titulo: str, subtitulo: str) -> None:
-    """
-    Escribe el titulo y el subtitulo por encima del area de graficado.
-
-    La separacion se mide en puntos y no en fraccion de los ejes, porque una
-    fraccion fija equivale a distinta distancia segun el alto de la figura: lo
-    que separa bien en una de 5 pulgadas superpone los textos en una de 11.
-    """
+    """Escribe el titulo y el subtitulo por encima del area de graficado."""
     ax.set_title(
         titulo, fontsize=13, fontweight="bold", color=TINTA, loc="left", pad=26
     )
@@ -114,17 +88,8 @@ def titular(ax, titulo: str, subtitulo: str) -> None:
 
 
 def marcar_nacional(ax, valor: float) -> None:
-    """
-    Dibuja la linea de referencia nacional y la etiqueta.
-
-    La etiqueta se coloca dentro del area de graficado, en la parte superior,
-    para no invadir el eje. blended_transform_factory combina dos sistemas de
-    coordenadas: la posicion horizontal se expresa en unidades de los datos,
-    para que siga a la linea, y la vertical en fraccion de los ejes, para que
-    quede arriba sea cual sea la escala.
-    """
+    """Dibuja la linea de referencia con la prevalencia nacional."""
     ax.axvline(valor, color=NARANJA, linewidth=1.6, linestyle="--")
-    # Aire arriba para que la etiqueta no caiga encima de la barra mas alta.
     y0, y1 = ax.get_ylim()
     ax.set_ylim(y0, y1 + (y1 - y0) * 0.07)
     trans = blended_transform_factory(ax.transData, ax.transAxes)
@@ -143,9 +108,6 @@ def marcar_nacional(ax, valor: float) -> None:
 
 def pie_de_figura(ax, texto: str) -> None:
     """Escribe la nota al pie con la fuente de los datos y el tamano de muestra."""
-    # El desplazamiento va en puntos respecto de la esquina inferior izquierda
-    # de los ejes, de modo que la nota quede por debajo de la etiqueta del eje
-    # en cualquier figura, sin importar su alto.
     ax.annotate(
         texto,
         xy=(0, 0),
@@ -160,11 +122,9 @@ def pie_de_figura(ax, texto: str) -> None:
 
 
 def guardar(fig, nombre: str) -> None:
-    """Escribe la figura en reports/figuras/ y libera la memoria que ocupaba."""
+    """Escribe la figura en reports/figuras/ y libera la memoria."""
     RUTA_FIGURAS.mkdir(parents=True, exist_ok=True)
     ruta = RUTA_FIGURAS / nombre
-    # bbox_inches="tight" recorta el margen sobrante y, de paso, asegura que
-    # los textos colocados fuera de los ejes entren en la imagen.
     fig.savefig(ruta, bbox_inches="tight")
     plt.close(fig)
     print(f"[graficas] {ruta.relative_to(BASE_DIR)}")
@@ -174,9 +134,8 @@ def prevalencia_ponderada(df: pl.DataFrame, columna: str) -> pl.DataFrame:
     """
     Calcula la prevalencia de violencia dentro de cada categoria de la columna.
 
-    Es una proporcion ponderada: suma los factores de expansion de las mujeres
-    que reportaron violencia y los divide entre la suma de factores de todas
-    las del grupo. Devuelve las categorias ordenadas de menor a mayor.
+    Divide la suma de factores de expansion de las mujeres que reportaron
+    violencia entre la suma de factores de todo el grupo.
     """
     return (
         df.group_by(columna)
@@ -199,9 +158,7 @@ def figura_01_distribucion_edad(df: pl.DataFrame) -> None:
     """
     Histograma de edad_primer_union.
 
-    La figura muestra la anomalia de la variable en lugar de ocultarla: la
-    franja de valores imposibles para una edad va sombreada y anotada con su
-    peso dentro del total.
+    Sombrea el tramo de valores menores a 10 y lo anota con su porcentaje.
     """
     valores = df.filter(pl.col("edad_primer_union").is_not_null())[
         "edad_primer_union"
@@ -209,9 +166,7 @@ def figura_01_distribucion_edad(df: pl.DataFrame) -> None:
     imposibles = int((valores < 10).sum())
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    # Un bin por valor entero: la variable se declara en anios completos, y
-    # agrupar en intervalos mas anchos borraria los picos en los multiplos de
-    # cinco, que son la huella del redondeo al declarar.
+    # Un bin por cada valor entero.
     ax.hist(
         valores,
         bins=np.arange(0, valores.max() + 2, 1),
@@ -222,8 +177,6 @@ def figura_01_distribucion_edad(df: pl.DataFrame) -> None:
 
     ax.axvspan(-0.5, 9.5, color=NARANJA, alpha=0.10, zorder=0)
     ax.axvline(9.5, color=NARANJA, linewidth=1.6, linestyle="--")
-    # La flecha y el texto comparten altura, y el texto se centra
-    # verticalmente sobre ella, de modo que la flecha quede horizontal.
     altura = ax.get_ylim()[1] * 0.72
     ax.annotate(
         f"{imposibles:,} valores ({100 * imposibles / len(valores):.1f}%)\n"
@@ -256,13 +209,9 @@ def figura_01_distribucion_edad(df: pl.DataFrame) -> None:
 
 def figura_02_ingreso_por_violencia(df: pl.DataFrame) -> None:
     """
-    Compara el ingreso de la pareja entre los dos grupos, percentil a percentil.
+    Compara el ingreso de la pareja entre los dos grupos.
 
-    La comparacion se hace por percentiles y no con un diagrama de caja porque
-    lo relevante es en que tramo de la distribucion se separan los grupos: las
-    medianas son casi iguales y la brecha aparece en Q3 y P90. Un boxplot
-    resume esos mismos cortes, pero la cola hasta 800,000 obliga a una escala
-    en la que las cajas quedan indistinguibles.
+    Enfrenta ambos grupos en los percentiles 10, 25, 50, 75 y 90.
     """
     sub = df.filter(
         pl.col("ingreso_pareja").is_not_null() & (pl.col("ingreso_pareja") > 0)
@@ -274,14 +223,11 @@ def figura_02_ingreso_por_violencia(df: pl.DataFrame) -> None:
         "ingreso_pareja"
     ].to_numpy()
 
-    # Cinco cortes de la distribucion, de la cola baja a la alta.
     etiquetas = ["P10", "Q1 (P25)", "Mediana", "Q3 (P75)", "P90"]
     cortes = [10, 25, 50, 75, 90]
     v_con = np.percentile(con, cortes)
     v_sin = np.percentile(sin, cortes)
 
-    # Cada percentil ocupa una posicion entera del eje y; las dos barras se
-    # desplazan media altura en sentidos opuestos para quedar enfrentadas.
     y = np.arange(len(etiquetas))
     alto = 0.38
 
@@ -308,7 +254,6 @@ def figura_02_ingreso_por_violencia(df: pl.DataFrame) -> None:
         )
 
     ax.set_yticks(y, etiquetas)
-    # Invertimos el eje para leer los percentiles de menor a mayor hacia abajo.
     ax.invert_yaxis()
     ax.set_xlim(0, max(v_sin.max(), v_con.max()) * 1.18)
     preparar_ejes(ax, eje_valor="x")
@@ -399,9 +344,8 @@ def figura_05_escolaridad(df: pl.DataFrame) -> None:
     """
     Distribucion de nivel_escolaridad en la muestra y en la poblacion.
 
-    Contrasta el peso de cada categoria antes y despues de aplicar el factor de
-    expansion. La distancia entre ambas barras es el efecto de la ponderacion, y
-    explica por que las medidas simples y las ponderadas no coinciden.
+    Enfrenta el porcentaje de cada categoria antes y despues de aplicar el
+    factor de expansion.
     """
     resumen = (
         df.group_by("nivel_escolaridad")
@@ -413,8 +357,7 @@ def figura_05_escolaridad(df: pl.DataFrame) -> None:
             (100 * pl.col("n") / df.height).alias("pct_muestra"),
             (100 * pl.col("poblacion") / df["factor_expansion"].sum()).alias("pct_pob"),
         )
-        # Orden natural de las categorias: al ser ordinal no se reordena por
-        # frecuencia, porque el orden forma parte de la informacion.
+        # Orden natural de las categorias, no por frecuencia.
         .sort("nivel_escolaridad")
     )
     categorias = [str(x) for x in resumen["nivel_escolaridad"].to_list()]

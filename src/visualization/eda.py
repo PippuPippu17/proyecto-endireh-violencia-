@@ -2,27 +2,13 @@
 Analisis exploratorio de la ENDIREH 2021.
 
 Calcula e imprime las medidas descriptivas de los Pasos 5, 6 y 7 sobre el
-dataset ya preprocesado:
+dataset ya preprocesado: moda y frecuencias de las cualitativas, medidas de
+localizacion en version simple y ponderada, y medidas de variabilidad
+comparando el grupo que reporto violencia de pareja contra el que no.
 
-    Cualitativas   Moda y tabla de frecuencias, en muestra y en poblacion.
-    Localizacion   Media, mediana, moda, cuartiles y percentiles 10 y 90,
-                   cada uno en version simple y ponderada por
-                   factor_expansion.
-    Variabilidad   Rango, varianza, desviacion estandar, coeficiente de
-                   variacion e IQR, comparando el grupo que reporto violencia
-                   de pareja contra el que no.
-
-Dos criterios rigen el calculo:
-
-1) Cada variable se filtra por separado. Al describir edad_primer_union se
-   descartan unicamente las filas con esa columna nula. Que una mujer entre o
-   no en la muestra de una medida no puede depender de que otra columna tenga
-   valor, porque eso sesga la muestra sin que se note.
-
-2) No se recorta el rango de los valores. Cuando una variable contiene valores
-   incompatibles con lo que su nombre afirma, el script los cuenta y lo
-   advierte junto al resultado. Acotar el rango hasta que la medida se vea
-   razonable produce una cifra que describe al filtro, no a la poblacion.
+Cada variable se filtra por separado. Los valores se toman completos, y las
+incompatibilidades entre una variable y su nombre se reportan como avisos junto
+a la medida correspondiente.
 
 Las funciones seccion_* son el punto de entrada que usa el notebook.
 
@@ -39,8 +25,7 @@ import polars as pl
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 from config.rutas import RUTA_DATA_PROCESSED
 
-# Variables cuantitativas que se describen. Las dos primeras son las que nombra
-# la practica; ingreso_pareja se suma por ser la unica continua del dataset.
+# Variables cuantitativas del dataset; ingreso_pareja es la unica continua.
 VARIABLES_CUANTITATIVAS = ["edad_primer_union", "num_hijos", "ingreso_pareja"]
 
 VARIABLES_CUALITATIVAS = [
@@ -62,18 +47,9 @@ def cuantil_ponderado(valores: np.ndarray, pesos: np.ndarray, q: float) -> float
     """
     Devuelve el cuantil q de los valores, ponderado por los pesos.
 
-    Ni numpy ni polars ofrecen cuantiles con pesos, asi que se calcula
-    siguiendo la definicion de la funcion de distribucion acumulada:
-
-        1. Se ordenan los valores de menor a mayor, y los pesos con ellos.
-        2. Se acumulan los pesos, lo que equivale a contar cuanta poblacion
-           queda por debajo de cada valor.
-        3. Se devuelve el primer valor cuyo peso acumulado alcanza la fraccion
-           q del total.
-
-    Corresponde a la definicion de CDF inversa, la habitual en datos de
-    encuesta. Con pesos iguales coincide con np.percentile, salvo cuando el
-    corte cae justo entre dos observaciones.
+    Ordena los valores, acumula los pesos y devuelve el primero cuyo peso
+    acumulado alcanza la fraccion q del total: la definicion de CDF inversa.
+    numpy y polars no ofrecen cuantiles con pesos.
     """
     orden = np.argsort(valores)
     v = valores[orden]
@@ -88,9 +64,8 @@ def moda_ponderada(valores: np.ndarray, pesos: np.ndarray):
     """
     Devuelve el valor con mayor peso acumulado.
 
-    La moda simple cuenta cuantas veces aparece cada valor en la muestra; esta
-    suma los factores de expansion, es decir, a cuanta poblacion representa
-    cada valor.
+    Suma los factores de expansion de cada valor distinto y devuelve el de
+    mayor total.
     """
     unicos = np.unique(valores)
     pesos_por_valor = [pesos[valores == u].sum() for u in unicos]
@@ -99,15 +74,12 @@ def moda_ponderada(valores: np.ndarray, pesos: np.ndarray):
 
 def medidas_localizacion(valores: np.ndarray, pesos: np.ndarray) -> dict:
     """
-    Calcula todas las medidas de localizacion de una variable.
+    Calcula las medidas de localizacion de una variable.
 
-    Devuelve un diccionario con cada medida en dos versiones: la simple, que
-    describe a la muestra encuestada, y la ponderada, que estima el valor en la
-    poblacion. n_modas indica cuantos valores empatan en frecuencia, para poder
-    advertir cuando la distribucion es multimodal y la moda deja de resumirla.
+    Cada medida se devuelve en dos versiones: la simple, sobre la muestra
+    encuestada, y la ponderada, sobre la poblacion estimada. n_modas indica
+    cuantos valores empatan en frecuencia.
     """
-    # np.unique devuelve los valores distintos ya ordenados y, con
-    # return_counts, cuantas veces aparece cada uno.
     unicos, cuentas = np.unique(valores, return_counts=True)
     moda_simple = float(unicos[int(np.argmax(cuentas))])
     n_modas = int((cuentas == cuentas.max()).sum())
@@ -138,9 +110,7 @@ def medidas_variabilidad(valores: np.ndarray) -> dict:
     """
     Calcula las medidas de dispersion de una variable.
 
-    ddof=1 hace que numpy divida entre n-1 en lugar de n, que es la varianza
-    muestral: la que corresponde cuando los datos son una muestra de una
-    poblacion mayor y no la poblacion completa.
+    ddof=1 produce la varianza muestral, que divide entre n-1.
     """
     media = float(np.mean(valores))
     desv = float(np.std(valores, ddof=1))
@@ -154,9 +124,7 @@ def medidas_variabilidad(valores: np.ndarray) -> dict:
         "maximo": float(np.max(valores)),
         "varianza": desv**2,
         "desv_est": desv,
-        # El CV expresa la desviacion como porcentaje de la media, lo que
-        # permite comparar dispersiones entre grupos de medias distintas. Con
-        # media cero no esta definido.
+        # El CV no esta definido con media cero.
         "CV": (desv / media * 100) if media != 0 else float("nan"),
         "IQR": q3 - q1,
     }
@@ -168,7 +136,7 @@ def medidas_variabilidad(valores: np.ndarray) -> dict:
 
 
 def titulo(texto: str, caracter: str = "=") -> None:
-    """Imprime un encabezado de seccion con la anchura fija del reporte."""
+    """Imprime un encabezado de seccion."""
     print("\n" + caracter * ANCHO)
     print(f" {texto}")
     print(caracter * ANCHO)
@@ -178,8 +146,7 @@ def serie_valida(df: pl.DataFrame, columna: str) -> pl.DataFrame:
     """
     Devuelve las filas en que la columna indicada tiene valor.
 
-    Filtra unicamente por esa columna: los nulos de las demas no reducen la
-    muestra sobre la que se calcula esta medida.
+    Filtra unicamente por esa columna; los nulos de las demas no intervienen.
     """
     return df.filter(pl.col(columna).is_not_null())
 
@@ -188,9 +155,7 @@ def alertas_de_coherencia(columna: str, valores: np.ndarray) -> list[str]:
     """
     Devuelve los avisos aplicables a una variable.
 
-    Contrasta los valores observados contra lo que el nombre de la variable
-    afirma y describe la discrepancia cuando existe. Los avisos se imprimen
-    junto a las medidas, de modo que ningun resultado aparezca sin su reserva.
+    Contrasta los valores observados contra lo que su nombre afirma.
     """
     avisos = []
     if columna == "edad_primer_union":
@@ -237,9 +202,6 @@ def imprimir_localizacion(columna: str, m: dict, avisos: list[str]) -> None:
         print(
             f"    (la distribucion es multimodal: {m['n_modas']} valores empatan en frecuencia)"
         )
-    # La brecha entre ambas medias mide cuanto corrige la ponderacion: si es
-    # amplia, la muestra sobrerrepresenta a grupos cuyo valor difiere del
-    # promedio poblacional.
     dif = m["media_pond"] - m["media"]
     print(f"\n    Diferencia media ponderada - media simple: {dif:+.2f}")
 
@@ -270,8 +232,6 @@ def imprimir_variabilidad(columna: str, con: dict, sin: dict, total: dict) -> No
                 f"    {nombre:<16}{total[clave]:>14,.2f}{con[clave]:>16,.2f}{sin[clave]:>16,.2f}"
             )
 
-    # Razon de los CV: por encima de 1 la dispersion relativa es mayor en el
-    # grupo que reporto violencia; por debajo, en el que no.
     if not (np.isnan(con["CV"]) or np.isnan(sin["CV"])):
         razon = con["CV"] / sin["CV"] if sin["CV"] else float("nan")
         print(f"\n    Razon de CV (con/sin): {razon:.2f}")
@@ -339,7 +299,6 @@ def seccion_cualitativas(df: pl.DataFrame) -> None:
             )
             .sort("poblacion", descending=True)
         )
-        # Tras ordenar por poblacion, la primera categoria es la moda ponderada.
         moda = resumen[columna][0]
         print(f"\n--- {columna}   (moda ponderada: {moda})")
         print(f"    {'Categoria':<34}{'Frec.':>10}{'% muestra':>12}{'% poblacion':>14}")
@@ -357,8 +316,6 @@ def seccion_prevalencia(df: pl.DataFrame) -> None:
     """Imprime la prevalencia ponderada de violencia, nacional y por grupo."""
     titulo("PREVALENCIA DE VIOLENCIA DE PAREJA (ponderada)")
 
-    # Prevalencia ponderada: suma de factores de las mujeres que reportaron
-    # violencia, entre la suma de factores de todas.
     total = 100 * (
         (df["sufrio_violencia_pareja"] * df["factor_expansion"]).sum()
         / df["factor_expansion"].sum()
