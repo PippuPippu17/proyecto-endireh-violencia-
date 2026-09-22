@@ -8,8 +8,7 @@ insertarse en el reporte:
     02_ingreso_por_violencia.png
     03_prevalencia_por_entidad.png
     04_prevalencia_por_estado_civil.png
-    05_dispersion_edad_por_violencia.png
-    06_escolaridad_muestra_vs_poblacion.png
+    05_escolaridad_muestra_vs_poblacion.png
 
 Cuatro criterios de diseno se aplican en todas ellas:
 
@@ -396,68 +395,7 @@ def figura_04_prevalencia_estado_civil(df: pl.DataFrame) -> None:
     guardar(fig, "04_prevalencia_por_estado_civil.png")
 
 
-def figura_05_dispersion_edad(df: pl.DataFrame) -> None:
-    """
-    Diagrama de caja de edad_primer_union segun si se reporto violencia.
-
-    Pone en imagen la comparacion de dispersion del Paso 7: la caja abarca el
-    rango intercuartilico y la linea interior marca la mediana, de modo que dos
-    cajas iguales describen dos distribuciones con la misma forma.
-    """
-    sub = df.filter(pl.col("edad_primer_union").is_not_null())
-    con = sub.filter(pl.col("sufrio_violencia_pareja") == 1)[
-        "edad_primer_union"
-    ].to_numpy()
-    sin = sub.filter(pl.col("sufrio_violencia_pareja") == 0)[
-        "edad_primer_union"
-    ].to_numpy()
-
-    fig, ax = plt.subplots(figsize=(9, 4.8))
-    cajas = ax.boxplot(
-        [sin, con],
-        tick_labels=["No reportó\nviolencia", "Reportó\nviolencia"],
-        vert=False,
-        patch_artist=True,
-        widths=0.5,
-        showfliers=False,
-        medianprops=dict(color=TINTA, linewidth=2),
-        whiskerprops=dict(color=TINTA_SUAVE, linewidth=1.2),
-        capprops=dict(color=TINTA_SUAVE, linewidth=1.2),
-        boxprops=dict(linewidth=0),
-    )
-    for caja, color in zip(cajas["boxes"], (AZUL, NARANJA)):
-        caja.set_facecolor(color)
-
-    # Los cuartiles coinciden en ambos grupos, asi que se rotulan una sola vez.
-    q1, mediana, q3 = np.percentile(sin, [25, 50, 75])
-    for valor, etiqueta in ((q1, "Q1"), (mediana, "Mediana"), (q3, "Q3")):
-        ax.annotate(
-            f"{etiqueta} = {valor:.0f}",
-            xy=(valor, 2.42),
-            fontsize=8.5,
-            color=TINTA_SUAVE,
-            ha="center",
-        )
-
-    ax.set_ylim(0.4, 2.7)
-    preparar_ejes(ax, eje_valor="x")
-    titular(
-        ax,
-        "Ambos grupos comparten la misma distribución",
-        "Dispersión de edad_primer_union según si se reportó violencia de pareja",
-    )
-    ax.set_xlabel("Valor declarado")
-    pie_de_figura(
-        ax,
-        f"ENDIREH 2021 (INEGI). n = {len(con):,} con violencia y {len(sin):,} sin violencia; "
-        "no se dibujan los valores atípicos.\n"
-        "Los dos grupos coinciden en Q1 (2), mediana (6), Q3 (15), IQR (13) y media (10.03): "
-        "la variable no discrimina\nentre quienes reportaron violencia y quienes no.",
-    )
-    guardar(fig, "05_dispersion_edad_por_violencia.png")
-
-
-def figura_06_escolaridad(df: pl.DataFrame) -> None:
+def figura_05_escolaridad(df: pl.DataFrame) -> None:
     """
     Distribucion de nivel_escolaridad en la muestra y en la poblacion.
 
@@ -532,7 +470,7 @@ def figura_06_escolaridad(df: pl.DataFrame) -> None:
         "C2 no corresponden al catálogo educativo del INEGI\ny se presentan sin interpretar "
         "su contenido.",
     )
-    guardar(fig, "06_escolaridad_muestra_vs_poblacion.png")
+    guardar(fig, "05_escolaridad_muestra_vs_poblacion.png")
 
 
 # --------------------------------------------------------------------------
@@ -551,9 +489,8 @@ def generar_graficas() -> None:
     figura_02_ingreso_por_violencia(df)
     figura_03_prevalencia_entidad(df)
     figura_04_prevalencia_estado_civil(df)
-    figura_05_dispersion_edad(df)
-    figura_06_escolaridad(df)
-    print("[graficas] Listo: 6 figuras generadas.")
+    figura_05_escolaridad(df)
+    print("[graficas] Listo: 5 figuras generadas.")
 
 
 if __name__ == "__main__":
